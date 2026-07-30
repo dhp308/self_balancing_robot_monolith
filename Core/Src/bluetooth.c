@@ -11,8 +11,8 @@ void BT_Init(UART_HandleTypeDef *huart, BT_Data *bt)
     bt->Kd = 5.0f;
     memset(bt->buffer, 0, BT_BUFFER_SIZE);
 
-    // UART 수신 인터럽트 시작
-    HAL_UART_Receive_IT(huart, (uint8_t*)bt->buffer, BT_BUFFER_SIZE);
+    // Idle Line 감지 방식으로 수신 시작
+    HAL_UARTEx_ReceiveToIdle_IT(huart, (uint8_t*)bt->buffer, BT_BUFFER_SIZE);
 }
 
 void BT_ParseCommand(BT_Data *bt)

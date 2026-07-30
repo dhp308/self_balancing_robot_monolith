@@ -4,7 +4,7 @@
 #include "main.h"
 
 // 블루투스 버퍼 크기
-#define BT_BUFFER_SIZE  64
+#define BT_BUFFER_SIZE  16
 
 // 수신 데이터 구조체
 typedef struct {
