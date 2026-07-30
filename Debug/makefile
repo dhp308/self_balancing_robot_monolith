@@ -69,7 +69,7 @@ main-build: self_balancing_robot.elf secondary-outputs
 
 # Tool invocations
 self_balancing_robot.elf self_balancing_robot.map: $(OBJS) $(USER_OBJS) /Users/parkdaeho/self_balancing_robot/STM32F411CEUX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "self_balancing_robot.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/parkdaeho/self_balancing_robot/STM32F411CEUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="self_balancing_robot.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "self_balancing_robot.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"/Users/parkdaeho/self_balancing_robot/STM32F411CEUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="self_balancing_robot.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

@@ -55,6 +55,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t imuTaskHandle;
 osThreadId_t pidTaskHandle;
 osThreadId_t btTaskHandle;
+osThreadId_t imuDebugTaskHandle;   // [진단용] IMU 각도 USB 출력 태스크
 
 // 태스크 속성
 const osThreadAttr_t imuTask_attributes = {
@@ -72,11 +73,18 @@ const osThreadAttr_t btTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+// [진단용] IMU 디버그 태스크 속성 - 테스트 끝나면 삭제
+const osThreadAttr_t imuDebugTask_attributes = {
+  .name = "imuDebugTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 
 // 전역 변수
 MPU6050_Data imu_data;
 PID_Controller pid;
 BT_Data bt_data;
+volatile uint32_t i2c_fail_count = 0;
 
 // 뮤텍스
 osMutexId_t imu_mutex;
@@ -95,6 +103,7 @@ void StartDefaultTask(void *argument);
 void StartIMUTask(void *argument);
 void StartPIDTask(void *argument);
 void StartBTTask(void *argument);
+void StartIMUDebugTask(void *argument);  // [진단용]
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -136,7 +145,10 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   // 부품 초기화
-  MPU6050_Init(&hi2c1);
+  if (MPU6050_Init(&hi2c1) != HAL_OK)
+  {
+    i2c_fail_count += 1000;  // 초기화 실패면 fail 카운트가 확 튀게 표시
+  }
   Motor_Init(&htim1);
   PID_Init(&pid, PID_KP_INIT, PID_KI_INIT, PID_KD_INIT);
   BT_Init(&huart1, &bt_data);
@@ -170,6 +182,7 @@ int main(void)
   imuTaskHandle = osThreadNew(StartIMUTask, NULL, &imuTask_attributes);
   pidTaskHandle = osThreadNew(StartPIDTask, NULL, &pidTask_attributes);
   btTaskHandle  = osThreadNew(StartBTTask,  NULL, &btTask_attributes);
+  imuDebugTaskHandle = osThreadNew(StartIMUDebugTask, NULL, &imuDebugTask_attributes);  // [진단용] 테스트 끝나면 이 줄 삭제
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -443,7 +456,58 @@ void StartIMUTask(void *argument)
       imu_data = temp;
       osMutexRelease(imu_mutex);
     }
+    else
+    {
+      i2c_fail_count++;
+    }
     osDelay(CONTROL_PERIOD);
+  }
+}
+
+// [진단용] I2C 버스 스캐너 - 0x01~0x7F 전체 주소 훑어서 응답하는 주소 출력
+void I2C_ScanBus(I2C_HandleTypeDef *hi2c)
+{
+  char msg[64];
+  int len = snprintf(msg, sizeof(msg), "--- I2C SCAN START ---\r\n");
+  CDC_Transmit_FS((uint8_t*)msg, len);
+  osDelay(50);
+
+  int found = 0;
+  for (uint8_t addr = 1; addr < 128; addr++)
+  {
+    if (HAL_I2C_IsDeviceReady(hi2c, (uint16_t)(addr << 1), 2, 10) == HAL_OK)
+    {
+      len = snprintf(msg, sizeof(msg), "Found device at 0x%02X\r\n", addr);
+      CDC_Transmit_FS((uint8_t*)msg, len);
+      osDelay(50);
+      found++;
+    }
+  }
+
+  len = snprintf(msg, sizeof(msg), "--- SCAN DONE (%d found) ---\r\n", found);
+  CDC_Transmit_FS((uint8_t*)msg, len);
+}
+
+// [진단용] IMU 각도값을 USB CDC로 출력 - 100ms 주기
+// 맥북에서 확인: screen /dev/tty.usbmodemXXXX 115200 또는 CoolTerm
+// 테스트 끝나면 이 함수 + 위쪽 등록 코드 삭제해도 됨
+void StartIMUDebugTask(void *argument)
+{
+  char msg[64];
+  osDelay(2000);// USB CDC 열거(enumeration) 시간 확보 (defaultTask에서 USB_DEVICE_Init 실행됨)
+  //I2C_ScanBus(&hi2c1);   // 진단용, 한 번만 실행
+  for(;;)
+  {
+    MPU6050_Data snapshot;
+    osMutexAcquire(imu_mutex, osWaitForever);
+    snapshot = imu_data;
+    osMutexRelease(imu_mutex);
+
+    int len = snprintf(msg, sizeof(msg), "angle: %.2f  gyro: %.2f\r\n",
+                        snapshot.angle, snapshot.gyro_rate);
+    CDC_Transmit_FS((uint8_t*)msg, len);
+
+    osDelay(100);
   }
 }
 

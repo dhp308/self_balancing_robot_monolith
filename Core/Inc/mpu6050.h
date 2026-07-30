@@ -18,6 +18,9 @@
 typedef struct {
     float angle;      // 현재 각도 (도)
     float gyro_rate;  // 각속도 (도/초)
+    int16_t raw_accel_x;  // 진단용
+    int16_t raw_accel_z;  // 진단용
+    int16_t raw_gyro_y;   // 진단용
 } MPU6050_Data;
 
 // 함수 선언

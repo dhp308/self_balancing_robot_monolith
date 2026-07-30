@@ -54,6 +54,9 @@ HAL_StatusTypeDef MPU6050_ReadData(I2C_HandleTypeDef *hi2c, MPU6050_Data *data)
 
     data->angle = angle;
     data->gyro_rate = gyro_rate;
+    data->raw_accel_x = accel_x;   // 진단용
+    data->raw_accel_z = accel_z;   // 진단용
+    data->raw_gyro_y = gyro_y;     // 진단용
 
     return HAL_OK;
 }
